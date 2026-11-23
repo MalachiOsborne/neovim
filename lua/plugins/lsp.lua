@@ -1,0 +1,111 @@
+local function get_env(key)
+	local env = vim.fn.getenv(key)
+
+	if env == vim.NIL or env == "" then
+		return nil
+	end
+
+	return env
+end
+
+local function get_list(key)
+	local env = get_env(key)
+
+	if not env then
+		return {}
+	end
+
+	return vim.split(env, ",")
+end
+-- https://mason-registry.dev/registry/list
+local PACKAGES = {
+	-- LSP
+	"clangd",
+	"css_variables",
+	"cssls",
+	"cssmodules_ls",
+	"dockerls",
+	"eslint",
+	"html",
+	"jdtls",
+	"jsonls",
+	"lua_ls",
+	"pyright",
+	"tailwindcss",
+	"ts_query_ls",
+	"ts_ls",
+	"yamlls",
+	-- Format
+	"ruff",
+	"prettierd",
+	"stylua",
+	"clang-format",
+	-- Lint
+	"flake8",
+	"cpplint",
+	"pylint",
+}
+
+return {
+	{
+		-- Install LSP servers and 3rd-party tools
+		-- https://github.com/mason-org/mason.nvim
+		"mason-org/mason.nvim",
+		cond = not os.getenv("NVIM_GIT_DIFF"),
+		init = function()
+			-- Do not crowd home directory with NPM cache folder
+			vim.env.npm_config_cache = vim.env.HOME .. "/.cache/npm"
+		end,
+		opts = {
+			ui = {
+				border = "rounded",
+				height = 0.85,
+				width = 0.8,
+			},
+		},
+	},
+	{
+		-- Bridge between mason.nvim and lspconfig
+		-- https://github.com/mason-org/mason-lspconfig.nvim
+		"mason-org/mason-lspconfig.nvim",
+		cond = not os.getenv("NVIM_GIT_DIFF"),
+		opts = {},
+
+		dependencies = {
+			"mason-org/mason.nvim",
+			"neovim/nvim-lspconfig",
+		},
+	},
+	{
+		-- Install and upgrade 3rd-party tools managed by mason.nvim
+		-- https://github.com/WhoIsSethDaniel/mason-tool-installer.nvim
+		"WhoIsSethDaniel/mason-tool-installer.nvim",
+		cond = not os.getenv("NVIM_GIT_DIFF"),
+		opts = function()
+			local packages = vim.tbl_deep_extend("force", {}, PACKAGES)
+
+			local disabled_packages = get_list("MASON_DISABLED_PACKAGES")
+			local disabled_servers = get_list("LSP_DISABLED_SERVERS")
+			local disabled = vim.list_extend(vim.list_slice(disabled_packages), disabled_servers)
+
+			-- Filter out disabled packages and servers
+			packages = vim.tbl_filter(function(pkg)
+				return not vim.tbl_contains(disabled, pkg)
+			end, packages)
+
+			return {
+				ensure_installed = packages,
+				integrations = {
+					["mason-lspconfig"] = true,
+					["mason-null-ls"] = false,
+					["mason-nvim-dap"] = false,
+				},
+			}
+		end,
+
+		dependencies = {
+			"mason-org/mason.nvim",
+			"mason-org/mason-lspconfig.nvim",
+		},
+	},
+}
